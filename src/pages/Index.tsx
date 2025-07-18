@@ -1,5 +1,5 @@
 import { ParticleBackground } from '@/components/three/ParticleBackground';
-import { YECSDashboard } from '@/components/dashboard/YECSDashboard';
+import { AdvancedYECSDashboard } from '@/components/dashboard/AdvancedYECSDashboard';
 
 const Index = () => {
   return (
@@ -8,7 +8,7 @@ const Index = () => {
       <ParticleBackground />
       
       {/* Main Dashboard */}
-      <YECSDashboard />
+      <AdvancedYECSDashboard />
     </div>
   );
 };
