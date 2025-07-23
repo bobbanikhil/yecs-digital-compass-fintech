@@ -1,46 +1,78 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ParticleBackground } from '@/components/three/ParticleBackground';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
-import { SmartOnboarding } from '@/components/onboarding/SmartOnboarding';
-import { ScoreResults } from '@/components/results/ScoreResults';
+import UserRegistration, { UserData } from '@/components/registration/UserRegistration';
+import ScoreCalculation from '@/components/loading/ScoreCalculation';
+import DetailedYECSResults from '@/components/results/DetailedYECSResults';
+import { ollamaClient, YECSScoreResult } from '@/lib/ollamaClient';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Github, Linkedin, Twitter } from 'lucide-react';
 
 export default function LandingPage() {
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [userScore, setUserScore] = useState(0);
+  const [currentView, setCurrentView] = useState<'landing' | 'registration' | 'calculating' | 'results'>('landing');
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [scoreResult, setScoreResult] = useState<YECSScoreResult | null>(null);
+  const { toast } = useToast();
 
-  const handleOnboardingComplete = (data: any, score: number) => {
+  const handleRegistrationComplete = async (data: UserData) => {
     setUserData(data);
-    setUserScore(score);
-    setShowOnboarding(false);
-    setShowResults(true);
+    setCurrentView('calculating');
+    
+    try {
+      const result = await ollamaClient.analyzeYECSScore(data);
+      setScoreResult(result);
+      setTimeout(() => setCurrentView('results'), 13000);
+    } catch (error) {
+      console.error('Error calculating score:', error);
+      toast({
+        title: "Calculation Error",
+        description: "There was an issue calculating your score. Please try again.",
+        variant: "destructive"
+      });
+      setCurrentView('registration');
+    }
   };
 
   const handleStartOver = () => {
-    setShowResults(false);
-    setShowOnboarding(false);
+    setCurrentView('landing');
     setUserData(null);
-    setUserScore(0);
+    setScoreResult(null);
   };
 
-  const scrollToOnboarding = () => {
-    setShowOnboarding(true);
-    setTimeout(() => {
-      document.getElementById('onboarding')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const handleViewDashboard = () => {
+    window.location.href = '/dashboard';
   };
+
+  const startRegistration = () => {
+    setCurrentView('registration');
+  };
+
+  if (currentView === 'registration') {
+    return <UserRegistration onComplete={handleRegistrationComplete} />;
+  }
+
+  if (currentView === 'calculating') {
+    return <ScoreCalculation onComplete={() => setCurrentView('results')} />;
+  }
+
+  if (currentView === 'results' && scoreResult && userData) {
+    return (
+      <DetailedYECSResults
+        result={scoreResult}
+        userData={userData}
+        onStartOver={handleStartOver}
+        onViewDashboard={handleViewDashboard}
+      />
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-background overflow-hidden">
-      {/* Particle Background */}
       <ParticleBackground />
       
-      {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 glass-card border-b border-primary/20">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -54,79 +86,54 @@ export default function LandingPage() {
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
               Features
             </a>
-            <a href="#onboarding" className="text-muted-foreground hover:text-foreground transition-colors">
-              Get Score
-            </a>
             <Button 
               variant="outline" 
               className="glass-button"
-              onClick={() => window.open('/dashboard', '_blank')}
+              onClick={startRegistration}
             >
-              Dashboard
+              Get Score
             </Button>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
       <main>
-        {/* Hero Section */}
-        <HeroSection />
-        
-        {/* Features Section */}
+        <HeroSection onGetStarted={startRegistration} />
         <FeaturesSection />
         
-        {/* Onboarding Section */}
-        {showOnboarding && (
-          <SmartOnboarding onComplete={handleOnboardingComplete} />
-        )}
-        
-        {/* Results Section */}
-        {showResults && userData && (
-          <ScoreResults 
-            score={userScore} 
-            userData={userData} 
-            onStartOver={handleStartOver}
-          />
-        )}
-        
-        {/* CTA Section */}
-        {!showOnboarding && !showResults && (
-          <section className="py-20 relative">
-            <div className="container mx-auto px-4 text-center">
-              <div className="max-w-4xl mx-auto">
-                <Badge className="mb-6 px-4 py-2 glass-button">
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  MKE TECH FUSE Workshop
-                </Badge>
-                
-                <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                  Ready to Disrupt Finance?
-                </h2>
-                
-                <p className="text-xl text-muted-foreground mb-8">
-                  Join thousands of young entrepreneurs who've already discovered their true credit potential
-                </p>
-                
-                <Button 
-                  size="lg" 
-                  className="gradient-primary hover-lift glow-primary px-8 py-4 text-lg"
-                  onClick={scrollToOnboarding}
-                >
-                  Get Your YECS Score Now
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-                
-                <p className="text-sm text-muted-foreground mt-4">
-                  Free assessment • No credit check required • Instant results
-                </p>
-              </div>
+        <section className="py-20 relative">
+          <div className="container mx-auto px-4 text-center">
+            <div className="max-w-4xl mx-auto">
+              <Badge className="mb-6 px-4 py-2 glass-button">
+                <ArrowRight className="w-4 h-4 mr-2" />
+                MKE TECH FUSE Workshop
+              </Badge>
+              
+              <h2 className="text-4xl md:text-5xl font-bold mb-6">
+                Ready to Disrupt Finance?
+              </h2>
+              
+              <p className="text-xl text-muted-foreground mb-8">
+                Join thousands of young entrepreneurs who've already discovered their true credit potential with AI-powered YECS scoring
+              </p>
+              
+              <Button 
+                size="lg" 
+                className="gradient-primary hover-lift glow-primary px-8 py-4 text-lg"
+                onClick={startRegistration}
+              >
+                Get Your YECS Score Now
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+              
+              <p className="text-sm text-muted-foreground mt-4">
+                Free assessment • Ollama AI-powered • Instant loan recommendations
+              </p>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border/50 bg-background/50 backdrop-blur-lg">
         <div className="container mx-auto px-4 py-12">
           <div className="grid md:grid-cols-4 gap-8">
@@ -138,7 +145,7 @@ export default function LandingPage() {
                 <span className="text-xl font-bold text-gradient">YECS</span>
               </div>
               <p className="text-muted-foreground">
-                Revolutionizing credit scoring for young entrepreneurs worldwide.
+                AI-powered credit scoring for young entrepreneurs. Built for MKE TECH FUSE.
               </p>
             </div>
             
@@ -146,7 +153,7 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Product</h4>
               <div className="space-y-2 text-muted-foreground">
                 <a href="#features" className="block hover:text-foreground transition-colors">Features</a>
-                <a href="#" className="block hover:text-foreground transition-colors">Pricing</a>
+                <a href="#" className="block hover:text-foreground transition-colors">AI Scoring</a>
                 <a href="#" className="block hover:text-foreground transition-colors">API</a>
               </div>
             </div>
@@ -155,7 +162,7 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Company</h4>
               <div className="space-y-2 text-muted-foreground">
                 <a href="#" className="block hover:text-foreground transition-colors">About</a>
-                <a href="#" className="block hover:text-foreground transition-colors">Blog</a>
+                <a href="#" className="block hover:text-foreground transition-colors">MKE TECH FUSE</a>
                 <a href="#" className="block hover:text-foreground transition-colors">Careers</a>
               </div>
             </div>
